@@ -12,29 +12,12 @@ import numpy as np
 import easyocr
 from PIL import ImageGrab
 
-# --- REQUIRED CALIBRATION (CRITICAL) ---
-# Check your Windows Settings > Display > Scale and layout (e.g., 125%).
-# Enter that percentage as a decimal (100% = 1.0, 125% = 1.25, 150% = 1.5).
-# If the offset is vertical, this factor fixes it.
 SCALE_FACTOR = 1.25 
-# --- --- ---
-
-# --- ADVANCED OPTIMIZATION SETTINGS ---
-# Lower this value to speed up updates. 0.2s is recommended for RTX 3050.
-# Setting it too low will cause FPS drop in game.
 LOOP_DELAY = 0.2 
-# The minimum width (in raw pixels) of English text to translate. 
-# Prevents translating tiny icons/noise.
 MIN_TEXT_WIDTH = 40 
-# OCR detection confidence threshold (0.0 to 1.0).
 OCR_THRESHOLD = 0.3 
-# --- --- ---
-
-# --- MODEL & STATE ---
+###
 print(f"EasyOCR v2 Loading (Z-Layer Optimal Mode, GPU ON)...")
-# Using Z-Layer optimal models (quantized/lightweight for speed)
-# By default,gpu=True is fine for 3050, but model_storage_directory
-# could point to pre-optimized models.
 try:
     reader = easyocr.Reader(['en'], gpu=True)
 except Exception as e:
@@ -44,9 +27,7 @@ except Exception as e:
 is_running = False
 overlay = None
 labels = []
-# Cache translation to avoid API calls for the same text
 translation_cache = {} 
-# Store previous bounding box to smooth movement
 prev_bbox_cache = {} 
 
 # --- FUNCTIONS ---
