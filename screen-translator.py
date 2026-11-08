@@ -12,16 +12,11 @@ import numpy as np
 import easyocr
 from PIL import ImageGrab
 
-# --- GÖRÜNTÜ VE DPI ÖLÇEKLENDİRME AYARI ---
-# Windows Ayarlar > Sistem > Monitör > Ölçeklendirme değeriniz (%125 için 1.25, %100 için 1.0)
 SCALE_FACTOR = 1.25
+LOOP_DELAY = 0.2
+MIN_TEXT_WIDTH = 40
+OCR_THRESHOLD = 0.3
 
-# --- PERFORMANS VE YAKALAMA AYARLARI ---
-LOOP_DELAY = 0.2          # Yenileme gecikmesi (0.2s önerilir)
-MIN_TEXT_WIDTH = 40       # Küçük simgeleri/gürültüleri çevirmemek için minimum piksel genişliği
-OCR_THRESHOLD = 0.3       # Tanıma güven eşiği (0.0 - 1.0)
-
-# --- EASYOCR MODEL YÜKLEME ---
 print("[*] EasyOCR Başlatılıyor (GPU / CUDA Modu)...")
 try:
     reader = easyocr.Reader(['en'], gpu=True)
@@ -33,9 +28,8 @@ except Exception as e:
 is_running = False
 overlay = None
 labels = []
-translation_cache = {}  # Tekrarlayan kelimeler için hızlı önbellek
+translation_cache = {}
 
-# --- HIZLI ÇEVİRİ FONKSİYONU ---
 def google_translate_fast(text, target_lang='tr'):
     if text in translation_cache:
         return translation_cache[text]
@@ -51,7 +45,6 @@ def google_translate_fast(text, target_lang='tr'):
     except Exception:
         return text
 
-# Koordinat Kalibrasyonu (DPI Uyumu)
 def calibrate_bbox(raw_bbox):
     raw_x = raw_bbox[0][0]
     raw_y = raw_bbox[0][1]
@@ -59,20 +52,15 @@ def calibrate_bbox(raw_bbox):
     calibrated_y = int(raw_y / SCALE_FACTOR)
     return calibrated_x, calibrated_y
 
-# Ekrana Şeffaf Çeviri Yazısını Basma
 def write_to_overlay(metin, x, y):
     global overlay, labels
     if overlay is None: 
         return
-    
-    # Arka gölge (okunabilirlik için)
+
     shadow = tk.Label(overlay, text=metin, font=("Segoe UI", 11, "bold"), fg="#101010", bg="black")
     shadow.place(x=x+1, y=y+1)
-    
-    # Ana yazı (yeşil renk)
     label = tk.Label(overlay, text=metin, font=("Segoe UI", 11, "bold"), fg="#00E676", bg="black")
     label.place(x=x, y=y)
-    
     labels.append(shadow)
     labels.append(label)
 
@@ -85,7 +73,6 @@ def clear_overlay():
             pass
     labels = []
 
-# Canlı OCR ve Çeviri Döngüsü
 def canlı_ceviri_dongusu():
     global is_running
     print("[+] Canlı ekran çevirisi aktif. Durdurmak için F4 tuşuna basın.")
@@ -93,20 +80,17 @@ def canlı_ceviri_dongusu():
     while is_running:
         start_time = time.time()
         try:
-            # 1. Ekran görüntüsü yakalama
             screen = np.array(ImageGrab.grab())
             screen_rgb = cv2.cvtColor(screen, cv2.COLOR_BGR2RGB)
-            
-            # 2. Metin tespiti (OCR)
+
             results = reader.readtext(screen_rgb, detail=1, paragraph=False)
-            
+
             if len(results) > 0 and is_running:
                 clear_overlay()
-            
+
             if not is_running: 
                 break
-            
-            # 3. Metinleri çevir ve ekrana yerleştir
+
             for (bbox, text, prob) in results:
                 raw_text = text.strip()
                 if prob > OCR_THRESHOLD and len(raw_text) > 1:
@@ -117,15 +101,14 @@ def canlı_ceviri_dongusu():
                     fixed_x, fixed_y = calibrate_bbox(bbox)
                     ceviri = google_translate_fast(raw_text)
                     write_to_overlay(ceviri, fixed_x, fixed_y)
-                    
+
         except Exception:
             pass
-            
+
         elapsed_time = time.time() - start_time
         sleep_time = max(0.01, LOOP_DELAY - elapsed_time)
         time.sleep(sleep_time)
 
-# Aç/Kapat (F4 Tetikleyici)
 def toggle_sistemi():
     global is_running
     if not is_running:
@@ -137,7 +120,6 @@ def toggle_sistemi():
         clear_overlay()
         print("\n>>> CANLI EKRAN ÇEVİRİSİ DURDURULDU <<<")
 
-# Şeffaf ve Tıklama Geçirgen Katman (Click-through Overlay)
 def create_layered_overlay():
     global overlay
     overlay = tk.Tk()
@@ -148,19 +130,14 @@ def create_layered_overlay():
     overlay.geometry(f"{sw}x{sh}+0+0")
     overlay.overrideredirect(True)
     overlay.configure(bg='black')
-    
-    # Siyah arka planı tamamen şeffaf yap
     overlay.wm_attributes("-transparentcolor", "black")
     overlay.attributes("-topmost", True)
-    
-    # Windows API: Fare tıklamalarını engellemeden arkadaki pencereye/oyuna geçirme
     hwnd = win32gui.FindWindow(None, "Screen_OCR_Translator_Overlay")
     extended_style = win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE)
     win32gui.SetWindowLong(hwnd, win32con.GWL_EXSTYLE, extended_style | win32con.WS_EX_LAYERED | win32con.WS_EX_TRANSPARENT)
     
     overlay.mainloop()
 
-# F4 Kısayol Tuşu
 keyboard.add_hotkey('f4', toggle_sistemi)
 
 print("=" * 60)
